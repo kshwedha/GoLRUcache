@@ -16,10 +16,32 @@ type LRUCache struct {
 }
 
 type Node struct {
-	key   int
-	value any
-	prev  *Node
-	next  *Node
+	key    int
+	value  any
+	expiry time.Time
+	prev   *Node
+	next   *Node
+}
+
+func (this *LRUCache) timerGoRoutine() {
+	// single timer implementation.
+	timer := time.NewTimer(1 * time.Second)
+
+	for {
+		select {
+		case <-timer.C:
+			timer.Reset(1 * time.Second)
+			this.mutex.Lock()
+			for key, node := range this.cache {
+				if time.Now().After(node.expiry) {
+					this.removeNode(node)
+					delete(this.cache, key)
+					fmt.Printf("[*] Removed node for the key %d\n", key)
+				}
+			}
+			this.mutex.Unlock()
+		}
+	}
 }
 
 func Constructor(capacity int) LRUCache {
@@ -44,15 +66,18 @@ func (this *LRUCache) Get(key int) any {
 }
 
 func (this *LRUCache) Set(key int, value any, expiry int) {
+	go this.timerGoRoutine()
 	this.mutex.Lock()
 	defer this.mutex.Unlock()
+	expiry_t := time.Now().Add(time.Duration(expiry) * time.Second)
 	// if key already present, update the value.
 	if node, ok := this.cache[key]; ok {
 		node.value = value
+		node.expiry = expiry_t
 		this.addToLRUcache(node)
 	} else {
 		// If the key doesn't exist, create a new node
-		node := &Node{key: key, value: value}
+		node := &Node{key: key, value: value, expiry: expiry_t}
 		// Add the new node to the front of the list
 		this.addToLRUcache(node)
 		this.cache[key] = node
@@ -63,18 +88,19 @@ func (this *LRUCache) Set(key int, value any, expiry int) {
 		}
 	}
 
-	go func() {
-		// after the expiry seconds of value initialisation, the value will be deleted.
-		fmt.Printf("[*] Removing key %d after %d seconds.\n", key, expiry)
-		time.Sleep(time.Duration(expiry) * time.Second)
-		this.mutex.Lock()
-		defer this.mutex.Unlock()
-		if node, ok := this.cache[key]; ok {
-			this.removeNode(node)
-			delete(this.cache, key)
-			fmt.Printf("[*] Removed node for the key %d\n", key)
-		}
-	}()
+	// commenting this out based on single routine execution
+	// go func() {
+	// 	// after the expiry seconds of value initialisation, the value will be deleted.
+	// 	fmt.Printf("[*] Removing key %d after %d seconds.\n", key, expiry)
+	// 	time.Sleep(time.Duration(expiry) * time.Second)
+	// 	this.mutex.Lock()
+	// 	defer this.mutex.Unlock()
+	// 	if node, ok := this.cache[key]; ok {
+	// 		this.removeNode(node)
+	// 		delete(this.cache, key)
+	// 		fmt.Printf("[*] Removed node for the key %d\n", key)
+	// 	}
+	// }()
 }
 
 func (this *LRUCache) moveAtop(node *Node) {
