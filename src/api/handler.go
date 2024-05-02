@@ -2,7 +2,6 @@ package api
 
 import (
 	"fmt"
-	"reflect"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
@@ -39,25 +38,14 @@ func GetHandler(c *fiber.Ctx) error {
 		return c.JSON(message)
 	}
 
-	if reflect.TypeOf(key) != nil {
-		value := cache.Get(int_key)
-		if value != -1 {
-			// fmt.Fprintf(c, "value of key: %s is %v", key, value)
-			// return nil
-			message.Message = "Value found"
-			message.Key = int_key
-			message.Value = value
-			return c.JSON(message)
-		}
-		// fmt.Fprintf(c, "value not found (uninitialised/expired) for: %s", key)
-		// return nil
-		message.Message = "value not found (uninitialised/expired)."
-		message.Key = int_key
+	value := cache.Get(int_key)
+	message.Key = int_key
+	if value != -1 {
+		message.Message = "Value found"
+		message.Value = value
 		return c.JSON(message)
 	}
-	// fmt.Fprintf(c, "Invalid key %s", key)
-	// return nil
-	message.Message = "Invalid Key."
+	message.Message = "value not found (uninitialised/expired)."
 	return c.JSON(message)
 }
 
@@ -70,8 +58,6 @@ func SetHandler(c *fiber.Ctx) error {
 		return err
 	}
 	cache.Set(data.Key, data.Value, data.Expiry)
-
-	// fmt.Fprintf(c, "Value %v has been set to key %d\n", c.Params(str_val), c.Params(data.Key))
 	message.Message = "Value has been set to key."
 	message.Key = data.Key
 	message.Value = data.Value
